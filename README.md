@@ -1,4 +1,4 @@
-# Gesture Controlled Privacy Mode
+# Sign-Language-Phrase-Cam-and-Filters
 
 Real-time webcam application that switches privacy filters and sign-mode actions using hand gestures detected with MediaPipe.
 

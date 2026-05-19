@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node -e \"import('fs').then(fs => {if(fs.default.existsSync('dist/Index.html')){try{fs.default.renameSync('dist/Index.html','dist/index.html')}catch(e){}}})\"",
+    "build": "npx vite build && node -e \"import('fs').then(fs => {if(fs.default.existsSync('dist/Index.html')){try{fs.default.renameSync('dist/Index.html','dist/index.html')}catch(e){}}})\"",
     "preview": "vite preview"
   },
   "dependencies": {

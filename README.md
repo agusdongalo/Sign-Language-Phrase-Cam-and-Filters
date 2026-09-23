@@ -241,9 +241,9 @@ This is edge-triggered, so you need to close and re-open the hand to step again.
 
 ### Exit Background Selection
 
-Show both fists again for about `2` seconds.
+Show both fists again for about `2` seconds to stop browsing. The selected background remains active.
 
-The selected background remains active after leaving selection mode.
+To stop the background replacement and return to `CLEAR`, wave an open palm from side to side in front of the camera. Keep the palm visible while moving it left and right.
 
 ## Sign Mode
 

@@ -20,11 +20,15 @@ FINGER_EXTEND_ANGLE = 160.0
 FINGER_FOLD_ANGLE = 95.0
 THUMB_EXTEND_ANGLE = 150.0
 THUMB_FOLD_ANGLE = 100.0
-BACKGROUND_DIR = "backgrounds"
+BACKGROUND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backgrounds")
 WRIST_CROSS_DISTANCE_THRESHOLD = 0.12
 ROCK_BUFFER_SIZE = 5
 ROCK_MIN_COUNT = 3
 BG_TOGGLE_HOLD_SECONDS = 2.0
+BG_WAVE_WINDOW_SECONDS = 1.25
+BG_WAVE_MIN_TRAVEL = 0.12
+BG_WAVE_MIN_REVERSALS = 1
+BG_BROWSE_COOLDOWN_SECONDS = 0.8
 CHEST_X_MIN = 0.35
 CHEST_X_MAX = 0.65
 CHEST_Y_MIN = 0.55
@@ -152,7 +156,8 @@ def detect_gesture(hand_landmarks, handedness_label):
     if thumb_up and index_up and middle_up and ring_up and pinky_up:
         return "OPEN_PALM"
 
-    # Middle finger: middle up, others strictly folded + middle higher than other tips
+    # Middle finger: middle up, other fingers folded, and middle tip above the others.
+    # Relaxed folded states help when curled fingers miss the strict angle threshold.
     index_folded_strict = (
         metrics["index_angle"] <= FINGER_FOLD_ANGLE and not metrics["index_y_up"]
     )
@@ -170,7 +175,7 @@ def detect_gesture(hand_landmarks, handedness_label):
         and hand_landmarks.landmark[12].y < hand_landmarks.landmark[16].y
         and hand_landmarks.landmark[12].y < hand_landmarks.landmark[20].y
     )
-    if middle_up and index_folded_strict and ring_folded_strict and pinky_folded_strict and middle_is_top:
+    if middle_up and index_folded and ring_folded and pinky_folded and middle_is_top:
         return "MIDDLE_FINGER"
 
     # Peace sign: index and middle strictly up, ring and pinky strictly folded
@@ -444,6 +449,10 @@ def generate_frames(cap):
     prev_cross = False
     rock_history = deque(maxlen=ROCK_BUFFER_SIZE)
     both_fists_start = None
+    bg_exit_latched = False
+    bg_exit_release_frames = 0
+    bg_wave_samples = deque()
+    last_bg_browse_time = 0.0
     seq_a_index = 0
     seq_b_index = 0
     seq_a_time = 0.0
@@ -521,6 +530,50 @@ def generate_frames(cap):
                     left_center_x - right_center_x
                 ) < 0
 
+            open_palm = left_open or right_open
+            now = time.time()
+            if current_mode == MODE_BG_IMAGE and (left_hand or right_hand):
+                if right_open:
+                    waving_hand = right_hand
+                elif left_open:
+                    waving_hand = left_hand
+                else:
+                    waving_hand = right_hand or left_hand
+                wrist_x = waving_hand["landmarks"].landmark[0].x
+                bg_wave_samples.append((now, wrist_x, open_palm))
+            else:
+                bg_wave_samples.clear()
+
+            while bg_wave_samples and now - bg_wave_samples[0][0] > BG_WAVE_WINDOW_SECONDS:
+                bg_wave_samples.popleft()
+
+            wave_directions = []
+            wave_positions = [x for _, x, _ in bg_wave_samples]
+            for previous_x, current_x in zip(wave_positions, wave_positions[1:]):
+                delta = current_x - previous_x
+                if abs(delta) >= 0.02:
+                    wave_directions.append(1 if delta > 0 else -1)
+            wave_reversals = sum(
+                previous != current
+                for previous, current in zip(wave_directions, wave_directions[1:])
+            )
+            palm_waving = (
+                len(wave_positions) >= 6
+                and sum(1 for _, _, was_open in bg_wave_samples if was_open) >= 4
+                and max(wave_positions) - min(wave_positions) >= BG_WAVE_MIN_TRAVEL
+                and wave_reversals >= BG_WAVE_MIN_REVERSALS
+            )
+
+            exit_background = False
+            if bg_exit_latched:
+                if open_palm:
+                    bg_exit_release_frames = 0
+                else:
+                    bg_exit_release_frames += 1
+                    if bg_exit_release_frames >= GESTURE_BUFFER_SIZE:
+                        bg_exit_latched = False
+                        bg_exit_release_frames = 0
+
             if current_mode == MODE_SIGN:
                 exit_sign = left_gesture == "MIDDLE_FINGER" or right_gesture == "MIDDLE_FINGER"
                 if exit_sign:
@@ -529,6 +582,16 @@ def generate_frames(cap):
                     bg_select_mode = False
                     both_fists_start = None
                     prev_both_fists = False
+            elif current_mode == MODE_BG_IMAGE and palm_waving:
+                current_mode = MODE_CLEAR
+                bg_select_mode = False
+                gesture_history.clear()
+                both_fists_start = None
+                prev_both_fists = False
+                bg_exit_latched = True
+                bg_exit_release_frames = 0
+                bg_wave_samples.clear()
+                exit_background = True
             else:
                 if bg_images:
                     if both_fists:
@@ -544,11 +607,15 @@ def generate_frames(cap):
                         both_fists_start = None
                         prev_both_fists = False
 
-                    if bg_select_mode:
+                    if bg_select_mode and not palm_waving:
                         if right_open and not prev_right_open:
-                            bg_index = (bg_index + 1) % len(bg_images)
+                            if now - last_bg_browse_time >= BG_BROWSE_COOLDOWN_SECONDS:
+                                bg_index = (bg_index + 1) % len(bg_images)
+                                last_bg_browse_time = now
                         if left_open and not prev_left_open:
-                            bg_index = (bg_index - 1) % len(bg_images)
+                            if now - last_bg_browse_time >= BG_BROWSE_COOLDOWN_SECONDS:
+                                bg_index = (bg_index - 1) % len(bg_images)
+                                last_bg_browse_time = now
 
             prev_left_open = left_open
             prev_right_open = right_open
@@ -558,7 +625,12 @@ def generate_frames(cap):
             primary_gesture = primary_hand["gesture"] if primary_hand else None
             primary_landmarks = primary_hand["landmarks"] if primary_hand else None
 
-            if not bg_select_mode and current_mode != MODE_SIGN:
+            if (
+                not bg_select_mode
+                and current_mode != MODE_SIGN
+                and not exit_background
+                and not bg_exit_latched
+            ):
                 gesture_history.append(primary_gesture or "NONE")
 
                 counts = Counter(gesture_history)

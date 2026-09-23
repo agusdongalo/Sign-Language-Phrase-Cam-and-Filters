@@ -39,9 +39,9 @@ To reduce flicker, gesture switching uses a short history buffer and only change
 
 ## Requirements
 
-- Windows
+- macOS
 - Python 3.11
-- Node.js (for building the React frontend)
+- Node.js 20.19+ (for building the React frontend)
 - Webcam
 
 ## Why Python 3.11
@@ -58,26 +58,32 @@ This project uses `mediapipe==0.10.11` and the classic `mp.solutions.*` APIs. In
 ## Installation
 
 ### 1. Python Backend Setup
-Open your PowerShell terminal and run:
+Open Terminal, go to the cloned repository, and run:
 
-```powershell
-cd "C:\xampp\htdocs\My Repos\GestureControlledPrivacyMode"
-py -3.11 -m venv .venv311
-.\.venv311\Scripts\python.exe -m pip install --upgrade pip
-.\.venv311\Scripts\python.exe -m pip install opencv-python mediapipe==0.10.11 numpy flask flask-cors
+```bash
+cd /path/to/Sign-Language-Phrase-Cam-and-Filters
+python3.11 -m venv .venv311
+source .venv311/bin/activate
+python -m pip install --upgrade pip
+python -m pip install opencv-python mediapipe==0.10.11 numpy flask flask-cors
 ```
 
-If `py -3.11` is not available, check installed Python versions:
+If `python3.11` is not available, install Python 3.11 and try again. With Homebrew:
 
-```powershell
-py -0p
+```bash
+brew install python@3.11
 ```
 
-Then either install Python 3.11 or point the commands above at an existing Python 3.11 interpreter.
+Confirm the interpreter before creating the environment:
+
+```bash
+python3.11 --version
+```
 
 ### 2. React Frontend Setup
-To run the web interface locally, you need to compile the React app:
-```powershell
+Build the React app so Flask can serve the generated `homepage/dist/index.html`:
+
+```bash
 cd homepage
 npm install
 npm run build
@@ -86,12 +92,15 @@ cd ..
 
 ## Run
 
-```powershell
-cd C:\xampp\htdocs\GestureControlledPrivacyMode
-.\.venv311\Scripts\python.exe app.py
+From the repository root, with the virtual environment activated, run:
+
+```bash
+python app.py
 ```
 
-The app opens a window named `Gesture Controlled Privacy Mode`.
+Open [http://localhost:5000](http://localhost:5000) in your browser. The app serves the React interface and starts reading from the webcam when the video feed is loaded.
+
+On first launch, macOS may ask for camera permission. Allow access for Terminal (or the application launching Python), then restart the app if necessary.
 
 Exit with:
 
@@ -279,12 +288,12 @@ Use this checklist after setup:
 ### Webcam does not open
 
 1. Close apps that may already be using the camera, such as Zoom, Teams, Discord, or a browser tab.
-2. Check Windows camera permissions:
-   `Settings -> Privacy & Security -> Camera`
+2. Check macOS camera permissions:
+   `System Settings -> Privacy & Security -> Camera`
 3. Run a quick OpenCV camera check:
 
-```powershell
-.\.venv311\Scripts\python.exe -c "import cv2; cap=cv2.VideoCapture(0); print('opened', cap.isOpened()); ret, frame = cap.read(); print('frame', ret); cap.release()"
+```bash
+python -c "import cv2; cap=cv2.VideoCapture(0); print('opened', cap.isOpened()); ret, frame = cap.read(); print('frame', ret); cap.release()"
 ```
 
 If it prints `opened False`, the camera index may be wrong or another process is locking the camera.

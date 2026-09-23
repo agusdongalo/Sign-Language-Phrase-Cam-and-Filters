@@ -58,27 +58,26 @@ This project uses `mediapipe==0.10.11` and the classic `mp.solutions.*` APIs. In
 ## Installation
 
 ### 1. Python Backend Setup
-Open Terminal, go to the cloned repository, and run:
+Install Python 3.11 first. Homebrew is recommended on macOS:
 
 ```bash
-cd /path/to/Sign-Language-Phrase-Cam-and-Filters
+brew install python@3.11
+```
+
+If Homebrew is not installed, download Python 3.11 from [python.org](https://www.python.org/downloads/).
+
+Then open a new Terminal window and go to the cloned repository. For the default Downloads location:
+
+```bash
+cd ~/Downloads/Sign-Language-Phrase-Cam-and-Filters
+python3.11 --version
 python3.11 -m venv .venv311
 source .venv311/bin/activate
 python -m pip install --upgrade pip
 python -m pip install opencv-python mediapipe==0.10.11 numpy flask flask-cors
 ```
 
-If `python3.11` is not available, install Python 3.11 and try again. With Homebrew:
-
-```bash
-brew install python@3.11
-```
-
-Confirm the interpreter before creating the environment:
-
-```bash
-python3.11 --version
-```
+If you cloned the repository somewhere else, replace the `cd` path with the actual path to your clone. You can drag the repository folder from Finder into Terminal after typing `cd ` to insert its path.
 
 ### 2. React Frontend Setup
 Build the React app so Flask can serve the generated `homepage/dist/index.html`:

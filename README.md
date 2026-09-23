@@ -58,13 +58,32 @@ This project uses `mediapipe==0.10.11` and the classic `mp.solutions.*` APIs. In
 ## Installation
 
 ### 1. Python Backend Setup
-Install Python 3.11 first. Homebrew is recommended on macOS:
+Install Python 3.11 first. Choose one of these options.
+
+**Option A: Homebrew**
+
+If `brew` is not installed, install Homebrew with its official installer:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+On Apple Silicon Macs, load Homebrew into the current terminal and configure it for future terminals:
+
+```bash
+eval "$(/opt/homebrew/bin/brew shellenv)"
+echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+```
+
+Then install Python 3.11:
 
 ```bash
 brew install python@3.11
 ```
 
-If Homebrew is not installed, download Python 3.11 from [python.org](https://www.python.org/downloads/).
+**Option B: Python.org**
+
+Alternatively, download and install Python 3.11 directly from [python.org](https://www.python.org/downloads/). No Homebrew installation is needed.
 
 Then open a new Terminal window and go to the cloned repository. For the default Downloads location:
 

@@ -417,12 +417,7 @@ def favicon():
     return '', 204
 
 
-def generate_frames():
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Error: Could not open webcam.")
-        return
-
+def generate_frames(cap):
     mp_hands = mp.solutions.hands
     mp_selfie = mp.solutions.selfie_segmentation
     mp_face = mp.solutions.face_detection
@@ -907,7 +902,17 @@ def generate_frames():
 
 @app.route('/video_feed')
 def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    # Open the camera before returning the streaming response so the browser
+    # receives a real HTTP error instead of an empty, apparently-live feed.
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        cap.release()
+        return Response(
+            "Could not open camera device 0. Check macOS camera permission and camera availability.",
+            status=503,
+            mimetype='text/plain',
+        )
+    return Response(generate_frames(cap), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 if __name__ == "__main__":

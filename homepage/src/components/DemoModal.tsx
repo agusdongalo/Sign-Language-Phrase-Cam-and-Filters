@@ -65,6 +65,7 @@ const effects: Effect[] = [
 ];
 
 export default function DemoModal({ open, onClose }: DemoModalProps) {
+  const liveBackend = window.location.port === '5000';
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -72,6 +73,9 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
 
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [liveFeedError, setLiveFeedError] = useState<string | null>(null);
+  const [liveFeedConnected, setLiveFeedConnected] = useState(false);
+  const [feedAttempt, setFeedAttempt] = useState(0);
   const [activeEffects, setActiveEffects] = useState<Record<EffectKey, boolean>>({
     blur: false,
     pixelate: false,
@@ -99,6 +103,15 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
 
   // Start camera
   const startCamera = useCallback(async () => {
+    if (liveBackend) {
+      setCameraError(null);
+      setLiveFeedError(null);
+      setLiveFeedConnected(false);
+      setFeedAttempt((attempt) => attempt + 1);
+      setCameraActive(true);
+      return;
+    }
+
     try {
       setCameraError(null);
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -115,7 +128,7 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
       setCameraError('Camera access denied or unavailable. Please allow camera permissions.');
       setCameraActive(false);
     }
-  }, []);
+  }, [liveBackend]);
 
   // Stop camera
   const stopCamera = useCallback(() => {
@@ -126,6 +139,7 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    setLiveFeedConnected(false);
     setCameraActive(false);
     cancelAnimationFrame(animFrameRef.current);
   }, []);
@@ -237,8 +251,9 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
   const videoFilters: string[] = [];
   if (activeEffects.blur) videoFilters.push('blur(8px)');
 
-  const showVideo = cameraActive && !activeEffects.pixelate;
+  const showVideo = cameraActive && !liveBackend && !activeEffects.pixelate;
   const showCanvas = cameraActive && activeEffects.pixelate;
+  const showLiveFeed = cameraActive && liveBackend;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
@@ -272,7 +287,7 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
               <Camera className="w-4 h-4 text-cyan-400" />
               <span className="text-sm font-semibold text-white">GesturGuard Demo</span>
             </div>
-            {cameraActive && (
+            {cameraActive && (!liveBackend || liveFeedConnected) && (
               <div className="flex items-center gap-2 ml-4">
                 <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20">
                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
@@ -337,6 +352,36 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
               }}
             />
 
+            <img
+              src={showLiveFeed ? `/video_feed?attempt=${feedAttempt}` : undefined}
+              alt="Live gesture-controlled camera feed"
+              className={`w-full h-full object-cover ${showLiveFeed ? 'block' : 'hidden'}`}
+              onLoad={() => {
+                setLiveFeedError(null);
+                setLiveFeedConnected(true);
+              }}
+              onError={() => {
+                setLiveFeedConnected(false);
+                setFps(0);
+                setLiveFeedError(
+                  'The Python camera stream could not start. Check macOS Camera permission for the app running Flask, close other camera apps, then try again.'
+                );
+              }}
+            />
+
+            {liveBackend && cameraActive && liveFeedError && (
+              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-black/90 px-6 text-center">
+                <CameraOff className="w-10 h-10 text-red-400" />
+                <p className="max-w-md text-sm text-red-300">{liveFeedError}</p>
+                <button
+                  onClick={startCamera}
+                  className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-5 py-2.5 text-sm font-medium text-cyan-300 hover:bg-cyan-500/20"
+                >
+                  Retry Camera
+                </button>
+              </div>
+            )}
+
             {/* Canvas for pixelation */}
             <canvas
               ref={canvasRef}
@@ -370,8 +415,9 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
                     <div>
                       <h3 className="text-xl font-bold text-white mb-2">Open Your Camera</h3>
                       <p className="text-sm text-slate-400 max-w-sm">
-                        Your video is processed entirely in-browser.
-                        Nothing is recorded or sent anywhere.
+                        {liveBackend
+                          ? 'The Python backend will process your camera feed and detect hand gestures.'
+                          : 'Your video is processed entirely in-browser. Nothing is recorded or sent anywhere.'}
                       </p>
                     </div>
                     <button
@@ -382,7 +428,9 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
                       Start Camera
                     </button>
                     <p className="text-[11px] text-slate-600">
-                      🔒 100% local · No data leaves your device
+                      {liveBackend
+                        ? 'MediaPipe gesture detection · Local Flask server'
+                        : '100% local · No data leaves your device'}
                     </p>
                   </>
                 )}
@@ -480,12 +528,12 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
                     <button
                       key={e.key}
                       onClick={() => toggleEffect(e.key)}
-                      disabled={!cameraActive}
+                      disabled={!cameraActive || liveBackend}
                       className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition-all duration-200 border ${
                         active
                           ? e.activeColor
                           : 'border-transparent text-slate-400 hover:bg-white/5 hover:text-white'
-                      } ${!cameraActive ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                      } ${!cameraActive || liveBackend ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       <IconComp className="w-4.5 h-4.5 shrink-0" />
                       <div className="min-w-0">
@@ -503,7 +551,9 @@ export default function DemoModal({ open, onClose }: DemoModalProps) {
               <div className="rounded-xl bg-cyan-500/5 border border-cyan-500/10 p-3">
                 <p className="text-[11px] text-slate-500 leading-relaxed">
                   <span className="text-cyan-400 font-medium">💡 Tip:</span>{' '}
-                  This is a browser preview. The full Python app includes ML-powered gesture detection for hands-free control.
+                  {liveBackend
+                    ? 'Live Python mode is active. Hold a gesture briefly and watch the camera overlay for the detected effect.'
+                    : 'This is a browser preview. The full Python app includes ML-powered gesture detection for hands-free control.'}
                 </p>
               </div>
             </div>

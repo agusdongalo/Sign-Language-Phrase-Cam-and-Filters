@@ -46,7 +46,7 @@ To reduce flicker, gesture switching uses a short history buffer and only change
 
 ## Why Python 3.11
 
-This project uses `mediapipe==0.10.11` and the classic `mp.solutions.*` APIs. In practice, this setup is most reliable on Python 3.11. If you try newer Python versions and MediaPipe wheels are missing or incompatible, please strictly use Python 3.11.
+This project uses `mediapipe==0.10.21` and the classic `mp.solutions.*` APIs. On Apple Silicon Macs, use the tested Python 3.11, NumPy 1.26, and OpenCV 4.11 combination below. Newer versions can cause MediaPipe's hand graph to fail during startup.
 
 ## Project Structure
 
@@ -93,7 +93,7 @@ python3.11 --version
 python3.11 -m venv .venv311
 source .venv311/bin/activate
 python -m pip install --upgrade pip
-python -m pip install opencv-python mediapipe==0.10.11 numpy flask flask-cors
+python -m pip install mediapipe==0.10.21 numpy==1.26.4 opencv-contrib-python==4.11.0.86 flask flask-cors
 ```
 
 If you cloned the repository somewhere else, replace the `cd` path with the actual path to your clone. You can drag the repository folder from Finder into Terminal after typing `cd ` to insert its path.
@@ -124,7 +124,23 @@ From the repository root, with the virtual environment activated, run:
 python app.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000) in your browser. The app serves the React interface and starts reading from the webcam when the video feed is loaded.
+Open [http://localhost:5000](http://localhost:5000) in your browser. The app serves the React interface and starts reading from the webcam when the video feed is loaded. When the site is opened through Flask on port `5000`, the demo uses the live Python/MediaPipe stream, so hand gestures control the effects. The standalone Vite preview uses simulated browser controls instead.
+
+If Flask reports `Address already in use` for port `5000`, an older copy of the app may still be running. Check the listener first:
+
+```bash
+lsof -nP -iTCP:5000 -sTCP:LISTEN
+```
+
+If the listener is an old Python process for this app, stop it and start Flask again:
+
+```bash
+PID=$(lsof -tiTCP:5000 -sTCP:LISTEN)
+if [ -n "$PID" ]; then kill $PID; fi
+python app.py
+```
+
+If `http://localhost:5000` already loads the app, do not start a second copy; continue using the existing server.
 
 On first launch, macOS may ask for camera permission. Allow access for Terminal (or the application launching Python), then restart the app if necessary.
 
@@ -339,6 +355,7 @@ Try values like `1` or `2`.
 If `mediapipe` fails to install or import:
 
 - confirm you are using Python 3.11
+- use `mediapipe==0.10.21`, `numpy==1.26.4`, and `opencv-contrib-python==4.11.0.86`
 - recreate the virtual environment
 - reinstall the packages in a clean environment
 

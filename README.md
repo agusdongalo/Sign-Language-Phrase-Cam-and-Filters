@@ -108,6 +108,14 @@ npm run build
 cd ..
 ```
 
+If `npm run build` exits with code `126` or reports that `vite` cannot be executed, restore the Vite launcher permission and run the build again:
+
+```bash
+chmod +x node_modules/.bin/vite
+npm run build
+cd ..
+```
+
 ## Run
 
 From the repository root, with the virtual environment activated, run:
